@@ -4,7 +4,7 @@ CloudLab profile to set up a Kubernetes cluster with flannel CNI and multus CNI 
 
 Instructions:
 Create the experiment in CloudLab. Wait until the start script completes (can see status in the CloudLab experiment page). Interact with the cluster
-using kubectl on node1 (the control-plane node). If something goes wrong, check the logs found in /home/k8s-flannel.
+using kubectl on node1 (the control-plane node). If something goes wrong, check the logs found in /home/eebpf.
 """
 
 import time
