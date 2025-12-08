@@ -47,6 +47,14 @@ echo -e '{
 sudo systemctl restart docker || (echo "ERROR: Docker installation failed, exiting." && exit -1)
 sudo docker run hello-world | grep "Hello from Docker!" || (echo "ERROR: Docker installation failed, exiting." && exit -1)
 
+sudo mkdir -p /etc/containerd
+containerd config default | sudo tee /etc/containerd/config.toml
+
+# Set SystemdCgroup to true to match kubelet and docker drivers
+sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+
+# Restart containerd to apply changes
+sudo systemctl restart containerd
 
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v${KUBERNETES_VERSION_STRING}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
@@ -68,6 +76,11 @@ sudo apt-get install helm
 sudo wget https://go.dev/dl/go1.25.5.linux-amd64.tar.gz
 sudo tar -C /usr/local -xzf go1.25.5.linux-amd64.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin' | sudo tee -a /etc/profile
+
+# Image cleanup
+sudo apt-get clean
+sudo rm -rf /var/lib/apt/lists/*
+sudo rm go1.25.5.linux-amd64.tar.gz 
 
 # Create $USER_GROUP group so $INSTALL_DIR can be accessible to everyone
 sudo groupadd $USER_GROUP
