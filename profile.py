@@ -83,11 +83,11 @@ for i in range(params.nodeCount):
 
 # Iterate over secondary nodes first
 for i, node in enumerate(nodes[1:]):
-    node.addService(rspec.Execute(shell="bash", command="/local/repository/start.sh secondary {}.{} {} > /home/eebpf/start.log 2>&1 &".format(
+    node.addService(rspec.Execute(shell="bash", command="bash /local/repository/start.sh secondary {}.{} {} > /home/eebpf/start.log 2>&1 &".format(
       BASE_IP, i + 2, params.startKubernetes)))
 
 # Start primary node
-nodes[0].addService(rspec.Execute(shell="bash", command="/local/repository/start.sh primary {}.1 {} {} > /home/eebpf/start.log 2>&1".format(
+nodes[0].addService(rspec.Execute(shell="bash", command="bash /local/repository/start.sh primary {}.1 {} {} > /home/eebpf/start.log 2>&1".format(
   BASE_IP, params.nodeCount, params.startKubernetes)))
 
 pc.printRequestRSpec()
