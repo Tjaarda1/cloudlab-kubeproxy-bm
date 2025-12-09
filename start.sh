@@ -227,7 +227,7 @@ apply_cni() {
 }
 
 add_cluster_nodes() {
-    REMOTE_CMD=$(tail -n 2 $INSTALL_DIR/k8s_install.log)
+    REMOTE_CMD=$(kubeadm token create --print-join-command)
     printf "%s: %s\n" "$(date +"%T.%N")" "Remote command is: $REMOTE_CMD"
 
     NUM_REGISTERED=$(kubectl get nodes | wc -l)
