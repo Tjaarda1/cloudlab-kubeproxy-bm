@@ -69,8 +69,9 @@ if params.kubeproxy == "ebpf":
             "KubeProxy in 'ebpf' mode is only supported when CNI is Calico or Cilium.",
             ['kubeproxy', 'cni'] 
         )
+    pc.reportError(perr)
 
-pc.reportError(perr)
+
 
 pc.verifyParameters()
 request = pc.makeRequestRSpec()
