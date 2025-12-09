@@ -33,7 +33,22 @@ pc.defineParameter("startKubernetes",
                    "Create Kubernetes cluster",
                    portal.ParameterType.BOOLEAN,
                    True,
-                   longDescription="Create a Kubernetes cluster using default image setup (calico networking, etc.)")
+                   longDescription="Create a Kubernetes cluster using the parameters. If false, kubeadm init won't be called.")
+# --- CNI Parameter ---
+pc.defineParameter("cni",
+                   "CNI Plugin",
+                   portal.ParameterType.STRING,
+                   "Flannel",
+                   legalValues=["Flannel", "Calico", "Cilium"],
+                   longDescription="Choose which CNI Plugin will be used.")
+
+# --- KubeProxy Parameter ---
+pc.defineParameter("kubeproxy",
+                   "KubeProxy Mode",
+                   portal.ParameterType.STRING,
+                   "iptables",
+                   legalValues=["iptables", "ipvs", "nftables", "ebpf"],
+                   longDescription="Choose kubeproxy mode. Note: eBPF mode is only supported for Calico and Cilium.")
 # Below option copy/pasted directly from small-lan experiment on CloudLab
 # Optional ephemeral blockstore
 pc.defineParameter("tempFileSystemSize", 
@@ -47,6 +62,15 @@ pc.defineParameter("tempFileSystemSize",
                    "if you expect you will need more space to build your software packages or store " +
                    "temporary files. 0 GB indicates maximum size.")
 params = pc.bindParameters()
+
+if params.kubeproxy == "ebpf":
+    if params.cni not in ["Calico", "Cilium"]:
+        perr = portal.ParameterError(
+            "KubeProxy in 'ebpf' mode is only supported when CNI is Calico or Cilium.",
+            ['kubeproxy', 'cni'] 
+        )
+
+pc.reportError(perr)
 
 pc.verifyParameters()
 request = pc.makeRequestRSpec()
@@ -66,7 +90,6 @@ def create_node(name, nodes, lan):
   bs = node.Blockstore(name + "-bs", "/mydata")
   bs.size = str(params.tempFileSystemSize) + "GB"
   bs.placement = "any"
-  
   # Add to node list
   nodes.append(node)
 
@@ -83,11 +106,15 @@ for i in range(params.nodeCount):
 
 # Iterate over secondary nodes first
 for i, node in enumerate(nodes[1:]):
-    node.addService(rspec.Execute(shell="bash", command="bash /local/repository/start.sh secondary {}.{} {} > /home/eebpf/start.log 2>&1 &".format(
-      BASE_IP, i + 2, params.startKubernetes)))
+  cmd = "bash /local/repository/start.sh secondary {}.{} {} {} {} > /home/eebpf/start.log 2>&1 &".format(
+        BASE_IP, i + 2, params.startKubernetes, params.cni, params.kubeproxy
+    )
 
-# Start primary node
-nodes[0].addService(rspec.Execute(shell="bash", command="bash /local/repository/start.sh primary {}.1 {} {} > /home/eebpf/start.log 2>&1".format(
-  BASE_IP, params.nodeCount, params.startKubernetes)))
+node.addService(rspec.Execute(shell="bash", command=cmd))
+
+cmd_primary = "bash /local/repository/start.sh primary {}.1 {} {} {} {} > /home/eebpf/start.log 2>&1".format(
+    BASE_IP, params.nodeCount, params.startKubernetes, params.cni, params.kubeproxy
+)
+nodes[0].addService(rspec.Execute(shell="bash", command=cmd_primary))
 
 pc.printRequestRSpec()

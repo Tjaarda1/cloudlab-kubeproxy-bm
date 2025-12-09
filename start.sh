@@ -7,11 +7,17 @@ INSTALL_DIR=/home/eebpf
 PROFILE_GROUP="eebpf"
 MULTUS_COMMIT="77e0150"
 
-NUM_MIN_ARGS=3
-NUM_PRIMARY_ARGS=4
 PRIMARY_ARG="primary"
 SECONDARY_ARG="secondary"
-USAGE=$'Usage:\n\t./start.sh secondary <node_ip> <start_kubernetes>\n\t./start.sh primary <node_ip> <num_nodes> <start_kubernetes>'
+USAGE=$'Usage:
+\t./start.sh secondary <node_ip> <start_kubernetes> <cni_plugin> <kube_proxy_mode>
+\t./start.sh primary   <node_ip> <num_nodes> <start_kubernetes> <cni_plugin> <kube_proxy_mode>'
+
+printf "%s: args=(" "$(date +"%T.%N")"
+for var in "$@"; do
+    printf "'%s' " "$var"
+done
+printf ")\n"
 
 configure_docker_storage() {
     printf "%s: %s\n" "$(date +"%T.%N")" "Configuring docker storage"
@@ -43,7 +49,7 @@ disable_swap() {
 }
 
 setup_secondary() {
-    coproc nc { nc -l $1 $SECONDARY_PORT; }
+    coproc nc { nc -l $NODE_IP $SECONDARY_PORT; }
     while true; do
         printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for command to join kubernetes cluster, nc pid is $nc_PID"
         read -r -u${nc[0]} cmd
@@ -59,7 +65,7 @@ setup_secondary() {
 	if [ -z "$nc_PID" ]
 	then
 	    printf "%s: %s\n" "$(date +"%T.%N")" "Restarting listener via netcat..."
-	    coproc nc { nc -l $1 $SECONDARY_PORT; }
+	    coproc nc { nc -l $NODE_IP $SECONDARY_PORT; }
 	fi
     done
 
@@ -72,11 +78,42 @@ setup_secondary() {
     eval $MY_CMD
     printf "%s: %s\n" "$(date +"%T.%N")" "Done!"
 }
-
 setup_primary() {
+    case "$CNI_PLUGIN" in
+        "flannel")
+            POD_CIDR="10.244.0.0/16"
+            ;;
+        "calico")
+            POD_CIDR="192.168.0.0/16"
+            ;;
+        "cilium")
+            POD_CIDR="10.0.0.0/8"
+            ;;
+        *)
+            # Fallback default (usually Flannel's default)
+            POD_CIDR="10.244.0.0/16"
+            ;;
+    esac
     # initialize k8 primary node
     printf "%s: %s\n" "$(date +"%T.%N")" "Starting Kubernetes... (this can take several minutes)... "
-    sudo kubeadm init --apiserver-advertise-address=$1 --pod-network-cidr=10.244.0.0/16 > $INSTALL_DIR/k8s_install.log 2>&1
+    if [ "$KUBE_PROXY_MODE" == "ebpf" ]; then
+        sudo kubeadm init --apiserver-advertise-address=$NODE_IP --pod-network-cidr=$POD_CIDR --skip-phases=addon/kube-proxy > $INSTALL_DIR/k8s_install.log 2>&1
+        
+        if [ "$CNI_PLUGIN" == "cilium" ]; then
+
+            sudo helm repo add cilium https://helm.cilium.io/
+            API_SERVER_IP=$NODE_IP
+            API_SERVER_PORT=6443
+            helm install cilium cilium/cilium --version 1.18.4 \
+                --namespace kube-system \
+                --set kubeProxyReplacement=true \
+                --set k8sServiceHost=${API_SERVER_IP} \
+                --set k8sServicePort=${API_SERVER_PORT}
+        else
+            printf "TODO"
+    else
+        sudo kubeadm init --apiserver-advertise-address=$NODE_IP --pod-network-cidr=$POD_CIDR > $INSTALL_DIR/k8s_install.log 2>&1
+
     if [ $? -eq 0 ]; then
         printf "%s: %s\n" "$(date +"%T.%N")" "Done! Output in $INSTALL_DIR/k8s_install.log"
     else
@@ -97,41 +134,95 @@ setup_primary() {
     printf "%s: %s\n" "$(date +"%T.%N")" "Done!"
 }
 
-apply_flannel() {
-    kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml >> $INSTALL_DIR/flannel_install.log 2>&1
-    if [ $? -ne 0 ]; then
-       echo "***Error: Error when installing flannel. Logs in $INSTALL_DIR/flannel_install.log"
-       exit 1
-    fi
-    printf "%s: %s\n" "$(date +"%T.%N")" "Applied Flannel networking"
-
-    # wait for flannel pods to be in ready state
-    printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for flannel pods to have status of 'Running': "
-    NUM_PODS=$(kubectl get pods -n kube-flannel | wc -l)
-    NUM_RUNNING=$(kubectl get pods -n kube-flannel | grep " Running" | wc -l)
-    NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
-    while [ "$NUM_RUNNING" -ne 0 ]
-    do
-        sleep 1
-        printf "."
-        NUM_RUNNING=$(kubectl get pods -n kube-flannel | grep " Running" | wc -l)
-        NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
-    done
-    printf "%s: %s\n" "$(date +"%T.%N")" "Flannel pods running!"
+apply_cni() {
+    printf "%s: %s\n" "$(date +"%T.%N")" "Applying CNI Plugin: $CNI_PLUGIN"
     
-    # wait for kube-system pods to be in ready state
-    printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for all system pods to have status of 'Running': "
-    NUM_PODS=$(kubectl get pods -n kube-system | wc -l)
-    NUM_RUNNING=$(kubectl get pods -n kube-system | grep " Running" | wc -l)
-    NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
-    while [ "$NUM_RUNNING" -ne 0 ]
-    do
-        sleep 1
+    case "$CNI_PLUGIN" in 
+        "flannel")
+            kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml >> $INSTALL_DIR/flannel_install.log 2>&1
+            if [ $? -ne 0 ]; then
+               echo "***Error: Error when installing flannel. Logs in $INSTALL_DIR/flannel_install.log"
+               exit 1
+            fi
+            printf "%s: %s\n" "$(date +"%T.%N")" "Applied Flannel networking manifests"
+
+            # Wait for flannel pods to be in ready state
+            printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for flannel pods to have status of 'Running': "
+            # Give the API server a moment to register the new pods
+            sleep 2
+            NUM_PODS=$(kubectl get pods -n kube-flannel | wc -l)
+            NUM_RUNNING=$(kubectl get pods -n kube-flannel | grep " Running" | wc -l)
+            NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
+            while [ "$NUM_RUNNING" -ne 0 ]
+            do
+                sleep 2
+                printf "."
+                NUM_PODS=$(kubectl get pods -n kube-flannel | wc -l)
+                NUM_RUNNING=$(kubectl get pods -n kube-flannel | grep " Running" | wc -l)
+                NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
+            done
+            printf "\n%s: %s\n" "$(date +"%T.%N")" "Flannel pods running!"
+            ;;
+            
+        "calico")
+            # Only apply here if not in eBPF mode (if eBPF, usually handled via specialized config or different CNI usage)
+            if [ "$KUBE_PROXY_MODE" != "ebpf" ]; then
+                printf "%s: %s\n" "$(date +"%T.%N")" "Installing Tigera Operator..."
+                kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.2/manifests/tigera-operator.yaml >> $INSTALL_DIR/calico_install.log 2>&1
+                
+                # CRITICAL: Wait for the operator to establish CRDs before creating custom resources
+                printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for Tigera Operator to be available..."
+                kubectl wait --for=condition=available --timeout=90s deployment/tigera-operator -n tigera-operator >> $INSTALL_DIR/calico_install.log 2>&1
+
+                printf "%s: %s\n" "$(date +"%T.%N")" "Applying Calico Custom Resources..."
+                kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.2/manifests/custom-resources.yaml >> $INSTALL_DIR/calico_install.log 2>&1
+                
+                if [ $? -ne 0 ]; then
+                    echo "***Error: Error when installing Calico resources. Logs in $INSTALL_DIR/calico_install.log"
+                    exit 1
+                fi
+            fi
+            ;;
+            
+        "cilium")
+            # Note: If KUBE_PROXY_MODE is ebpf, Cilium is likely installed during setup_primary.
+            # This block handles the standard kube-proxy mode.
+            if [ "$KUBE_PROXY_MODE" != "ebpf" ]; then
+                helm repo add cilium https://helm.cilium.io/
+                helm repo update
+                helm install cilium cilium/cilium --version 1.18.4 --namespace kube-system >> $INSTALL_DIR/cilium_install.log 2>&1
+                
+                if [ $? -ne 0 ]; then
+                    echo "***Error: Error when installing Cilium. Logs in $INSTALL_DIR/cilium_install.log"
+                    exit 1
+                fi
+            fi
+            ;;
+            
+        *)
+            printf "CNI '%s' not recognized\n" "$CNI_PLUGIN"
+            ;;
+    esac
+
+    # Generic wait for all system pods (handles Calico, Cilium, and CoreDNS startup)
+    printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for all kube-system pods to reach 'Running' status..."
+    
+    # Simple loop to ensure stabilization
+    sleep 5 
+    
+    while true; do
+        # Get count of pods not running (ignoring Completed jobs)
+        NOT_RUNNING=$(kubectl get pods -n kube-system --no-headers | grep -v "Running\|Completed" | wc -l)
+        
+        if [ "$NOT_RUNNING" -eq 0 ]; then
+            break
+        fi
+        
         printf "."
-        NUM_RUNNING=$(kubectl get pods -n kube-system | grep " Running" | wc -l)
-        NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
+        sleep 2
     done
-    printf "%s: %s\n" "$(date +"%T.%N")" "Kubernetes system pods running!"
+    
+    printf "\n%s: %s\n" "$(date +"%T.%N")" "All Kubernetes system pods are running!"
 }
 
 add_cluster_nodes() {
@@ -139,13 +230,13 @@ add_cluster_nodes() {
     printf "%s: %s\n" "$(date +"%T.%N")" "Remote command is: $REMOTE_CMD"
 
     NUM_REGISTERED=$(kubectl get nodes | wc -l)
-    NUM_REGISTERED=$(($1-NUM_REGISTERED+1))
+    NUM_REGISTERED=$(($NODE_COUNT-NUM_REGISTERED+1))
     counter=0
     while [ "$NUM_REGISTERED" -ne 0 ]
     do 
 	      sleep 2
         printf "%s: %s\n" "$(date +"%T.%N")" "Registering nodes, attempt #$counter, registered=$NUM_REGISTERED"
-        for (( i=2; i<=$1; i++ ))
+        for (( i=2; i<=$NODE_COUNT; i++ ))
         do
             SECONDARY_IP=$BASE_IP$i
             echo $SECONDARY_IP
@@ -155,18 +246,18 @@ add_cluster_nodes() {
         done
 	      counter=$((counter+1))
         NUM_REGISTERED=$(kubectl get nodes | wc -l)
-        NUM_REGISTERED=$(($1-NUM_REGISTERED+1)) 
+        NUM_REGISTERED=$(($NODE_COUNT-NUM_REGISTERED+1)) 
     done
 
     printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for all nodes to have status of 'Ready': "
     NUM_READY=$(kubectl get nodes | grep " Ready" | wc -l)
-    NUM_READY=$(($1-NUM_READY))
+    NUM_READY=$(($NODE_COUNT-NUM_READY))
     while [ "$NUM_READY" -ne 0 ]
     do
         sleep 1
         printf "."
         NUM_READY=$(kubectl get nodes | grep " Ready" | wc -l)
-        NUM_READY=$(($1-NUM_READY))
+        NUM_READY=$(($NODE_COUNT-NUM_READY))
     done
     printf "%s: %s\n" "$(date +"%T.%N")" "Done!"
 }
@@ -205,26 +296,22 @@ apply_multus() {
 }
 
 
-# Start by recording the arguments
-printf "%s: args=(" "$(date +"%T.%N")"
-for var in "$@"
-do
-    printf "'%s' " "$var"
-done
-printf ")\n"
+# 1. Capture the Role and IP (Common to both)
+ROLE=$1
+NODE_IP=$2
 
-# Check the min number of arguments
-if [ $# -lt $NUM_MIN_ARGS ]; then
-    echo "***Error: Expected at least $NUM_MIN_ARGS arguments."
-    echo "$USAGE"
-    exit -1
-fi
-
-# Check to make sure the first argument is as expected
-if [ $1 != $PRIMARY_ARG -a $1 != $SECONDARY_ARG ] ; then
-    echo "***Error: First arg should be '$PRIMARY_ARG' or '$SECONDARY_ARG'"
-    echo "$USAGE"
-    exit -1
+# 2. Parse remaining arguments based on Role
+if [[ "$ROLE" == "primary" ]]; then
+    # Primary args: IP, NodeCount, StartK8s, CNI, Proxy
+    NODE_COUNT=$3
+    START_K8S=$4
+    CNI_PLUGIN=$5
+    KUBE_PROXY_MODE=$6
+else
+    # Secondary args: IP, StartK8s, CNI, Proxy (NodeCount is skipped)
+    START_K8S=$3
+    CNI_PLUGIN=$4
+    KUBE_PROXY_MODE=$5
 fi
 
 # Kubernetes does not support swap, so we must disable it
@@ -265,49 +352,44 @@ EOF
 
 sudo sysctl --system
 # At this point, a secondary node is fully configured until it is time for the node to join the cluster.
-if [ $1 == $SECONDARY_ARG ] ; then
+if [ $ROLE == $SECONDARY_ARG ] ; then
 
     # Exit early if we don't need to start Kubernetes
-    if [ "$3" == "False" ]; then
-        printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $3, done!"
+    if [ "$START_K8S" == "False" ]; then
+        printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $START_K8S, done!"
         exit 0
     fi
     
     # Use second argument (node IP) to replace filler in kubeadm configuration
-    sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+    sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 
-    setup_secondary $2
+    setup_secondary
     exit 0
 fi
 
-# Check the min number of arguments
-if [ $# -ne $NUM_PRIMARY_ARGS ]; then
-    echo "***Error: Expected at least $NUM_PRIMARY_ARGS arguments."
-    echo "$USAGE"
-    exit -1
-fi
+
 
 # Exit early if we don't need to start Kubernetes
-if [ "$4" = "False" ]; then
-    printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $4, done!"
+if [ "$START_K8S" = "False" ]; then
+    printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $START_K8S, done!"
     exit 0
 fi
 
 # Use second argument (node IP) to replace filler in kubeadm configuration
-sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$2/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 
 # Finish setting up the primary node
 # Argument is node_ip
-setup_primary $2
+setup_primary 
 
 # Apply flannel networking
-apply_flannel
+apply_cni
 
 # Install multus CNI plugin
-apply_multus
+#apply_multus
 
 # Coordinate master to add nodes to the kubernetes cluster
 # Argument is number of nodes
-add_cluster_nodes $3
+add_cluster_nodes 
 
 printf "%s: %s\n" "$(date +"%T.%N")" "Profile setup completed!"
