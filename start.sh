@@ -104,7 +104,7 @@ setup_primary() {
             sudo helm repo add cilium https://helm.cilium.io/
             API_SERVER_IP=$NODE_IP
             API_SERVER_PORT=6443
-            helm install cilium cilium/cilium --version 1.18.4 \
+            sudo helm install cilium cilium/cilium --version 1.18.4 \
                 --namespace kube-system \
                 --set kubeProxyReplacement=true \
                 --set k8sServiceHost=${API_SERVER_IP} \
@@ -189,9 +189,9 @@ apply_cni() {
             # Note: If KUBE_PROXY_MODE is ebpf, Cilium is likely installed during setup_primary.
             # This block handles the standard kube-proxy mode.
             if [ "$KUBE_PROXY_MODE" != "ebpf" ]; then
-                helm repo add cilium https://helm.cilium.io/
-                helm repo update
-                helm install cilium cilium/cilium --version 1.18.4 --namespace kube-system >> $INSTALL_DIR/cilium_install.log 2>&1
+                sudo helm repo add cilium https://helm.cilium.io/
+                sudo helm repo update
+                sudo helm install cilium cilium/cilium --version 1.18.4 --namespace kube-system >> $INSTALL_DIR/cilium_install.log 2>&1
                 
                 if [ $? -ne 0 ]; then
                     echo "***Error: Error when installing Cilium. Logs in $INSTALL_DIR/cilium_install.log"
