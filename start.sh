@@ -213,7 +213,7 @@ apply_cni() {
     
     while true; do
         # Get count of pods not running (ignoring Completed jobs)
-        NOT_RUNNING=$(kubectl get pods -n kube-system --no-headers | grep -v "Running\|Completed" | wc -l)
+        NOT_RUNNING=$(kubectl get pods -n kube-system --no-headers | grep -v "Running\|Completed\|Pending" | wc -l)
         
         if [ "$NOT_RUNNING" -eq 0 ]; then
             break
