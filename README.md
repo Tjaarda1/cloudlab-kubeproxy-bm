@@ -19,4 +19,4 @@ This CloudLab profile creates a highly configurable Kubernetes cluster designed 
 
 ## Acknowledgements
 
-This work heavily references and builds upon the [cloudlab-k8s-flannel](https://www.google.com/search?q=https://github.com/hunhoffe/cloudlab-k8s-flannel) repository by [hunhoffe](https://github.com/hunhoffe).
+This work heavily references and builds upon the [cloudlab-k8s-flannel](https://github.com/hunhoffe/cloudlab-k8s-flannel) repository by [hunhoffe](https://github.com/hunhoffe).
