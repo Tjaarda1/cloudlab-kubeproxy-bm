@@ -353,7 +353,7 @@ EOF
 
 sudo sysctl --system
 # At this point, a secondary node is fully configured until it is time for the node to join the cluster.
-if [ $ROLE == $SECONDARY_ARG ] ; then
+if [ "$ROLE" == "$SECONDARY_ARG" ] ; then
 
     # Exit early if we don't need to start Kubernetes
     if [ "$START_K8S" == "False" ]; then
