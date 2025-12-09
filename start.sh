@@ -150,18 +150,7 @@ apply_cni() {
             # Wait for flannel pods to be in ready state
             printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for flannel pods to have status of 'Running': "
             # Give the API server a moment to register the new pods
-            sleep 2
-            NUM_PODS=$(kubectl get pods -n kube-flannel | wc -l)
-            NUM_RUNNING=$(kubectl get pods -n kube-flannel | grep " Running" | wc -l)
-            NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
-            while [ "$NUM_RUNNING" -ne 0 ]
-            do
-                sleep 2
-                printf "."
-                NUM_PODS=$(kubectl get pods -n kube-flannel | wc -l)
-                NUM_RUNNING=$(kubectl get pods -n kube-flannel | grep " Running" | wc -l)
-                NUM_RUNNING=$((NUM_PODS-NUM_RUNNING))
-            done
+            kubectl wait --namespace kube-flannel --for=condition=Ready pods --all --timeout=60s
             printf "\n%s: %s\n" "$(date +"%T.%N")" "Flannel pods running!"
             ;;
             
@@ -362,7 +351,7 @@ if [ "$ROLE" == "$SECONDARY_ARG" ] ; then
     fi
     
     # Use second argument (node IP) to replace filler in kubeadm configuration
-    sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+    # sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 
     setup_secondary
     exit 0
@@ -377,7 +366,7 @@ if [ "$START_K8S" = "False" ]; then
 fi
 
 # Use second argument (node IP) to replace filler in kubeadm configuration
-sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+# sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 
 # Finish setting up the primary node
 # Argument is node_ip
