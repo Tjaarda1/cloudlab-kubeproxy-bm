@@ -111,9 +111,10 @@ setup_primary() {
                 --set k8sServicePort=${API_SERVER_PORT}
         else
             printf "TODO"
+        fi
     else
         sudo kubeadm init --apiserver-advertise-address=$NODE_IP --pod-network-cidr=$POD_CIDR > $INSTALL_DIR/k8s_install.log 2>&1
-
+    fi
     if [ $? -eq 0 ]; then
         printf "%s: %s\n" "$(date +"%T.%N")" "Done! Output in $INSTALL_DIR/k8s_install.log"
     else
