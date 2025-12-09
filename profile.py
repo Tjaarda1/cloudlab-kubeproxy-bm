@@ -38,8 +38,8 @@ pc.defineParameter("startKubernetes",
 pc.defineParameter("cni",
                    "CNI Plugin",
                    portal.ParameterType.STRING,
-                   "Flannel",
-                   legalValues=["Flannel", "Calico", "Cilium"],
+                   "flannel",
+                   legalValues=["flannel", "calico", "cilium"],
                    longDescription="Choose which CNI Plugin will be used.")
 
 # --- KubeProxy Parameter ---
@@ -64,7 +64,7 @@ pc.defineParameter("tempFileSystemSize",
 params = pc.bindParameters()
 
 if params.kubeproxy == "ebpf":
-    if params.cni not in ["Calico", "Cilium"]:
+    if params.cni not in ["calico", "cilium"]:
         perr = portal.ParameterError(
             "KubeProxy in 'ebpf' mode is only supported when CNI is Calico or Cilium.",
             ['kubeproxy', 'cni'] 
