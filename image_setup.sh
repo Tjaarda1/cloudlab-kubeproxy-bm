@@ -65,7 +65,7 @@ sudo apt-get install -y kubelet kubeadm kubectl
 
 sudo mkdir -p /etc/kubeadm/
 
-sudo kubeadm config print init-defaults > /etc/kubeadm/config.yaml
+sudo kubeadm config print init-defaults | sudo tee /etc/kubeadm/config.yaml
 
 sudo sed -i "s/advertiseAddress: 1.2.3.4/advertiseAddress: REPLACE_ME_WITH_IP/" /etc/kubeadm/config.yaml
 
