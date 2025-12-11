@@ -1,6 +1,6 @@
 
 """
-CloudLab profile to set up a Kubernetes cluster with flannel CNI and multus CNI plugin installed. Each node runs Ubuntu24.04.
+Image for testing different kubeproxy replacements and cni configurations in Kubernetes clusters. Has basic Kubeadm config v1.34, docker, helm and gov1.25
 
 Instructions:
 Create the experiment in CloudLab. Wait until the start script completes (can see status in the CloudLab experiment page). Interact with the cluster
@@ -16,7 +16,7 @@ import geni.rspec.pg as rspec
 
 BASE_IP = "10.10.1"
 BANDWIDTH = 10000000
-IMAGE = ' urn:publicid:IDN+apt.emulab.net+image+meshbench-PG0:kubeproxy-bm:4'
+IMAGE = ' urn:publicid:IDN+apt.emulab.net+image+meshbench-PG0:kubeproxy-bm:5'
 
 # Set up parameters
 pc = portal.Context()
