@@ -82,6 +82,21 @@ setup_secondary() {
     printf "%s: %s\n" "$(date +"%T.%N")" "Done!"
 }
 setup_primary() {
+    case "$CNI_PLUGIN" in
+        "flannel")
+            POD_CIDR="10.244.0.0/16"
+            ;;
+        "calico")
+            POD_CIDR="192.168.0.0/16"
+            ;;
+        "cilium")
+            POD_CIDR="10.0.0.0/8"
+            ;;
+        *)
+            # Fallback default 
+            POD_CIDR="10.96.0.0/16"
+            ;;
+    esac
    # Use second argument (node IP) to replace filler in kubeadm configuration
     sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/kubeadm/init-config.yaml
     sudo sed -i.bak "s|REPLACE_ME_WITH_CIDR|$POD_CIDR|g" /etc/kubeadm/init-config.yaml
@@ -365,21 +380,7 @@ if [ "$START_K8S" = "False" ]; then
     printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $START_K8S, done!"
     exit 0
 fi
-case "$CNI_PLUGIN" in
-    "flannel")
-        POD_CIDR="10.244.0.0/16"
-        ;;
-    "calico")
-        POD_CIDR="192.168.0.0/16"
-        ;;
-    "cilium")
-        POD_CIDR="10.0.0.0/8"
-        ;;
-    *)
-        # Fallback default 
-        POD_CIDR="10.96.0.0/16"
-        ;;
-esac
+
 
 
 # Finish setting up the primary node
