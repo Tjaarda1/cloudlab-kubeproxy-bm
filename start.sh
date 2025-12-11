@@ -340,6 +340,20 @@ net.bridge.bridge-nf-call-ip6tables = 1
 net.ipv4.ip_forward                 = 1
 EOF
 
+if [ "$KUBE_PROXY_MODE" == "ipvs" ]; then
+    sudo modprobe ip_vs 
+    sudo modprobe ip_vs_rr
+    sudo modprobe ip_vs_wrr 
+    sudo modprobe ip_vs_sh
+    sudo modprobe nf_conntrack  
+    sudo apt install ipset ipvsadm -y
+fi
+
+# TODO: Compatibility check for iptables vs nftables in image. Probably should create different base images for each. https://manpages.debian.org/testing/nftables/nft.8.en.html
+if [ "$KUBE_PROXY_MODE" == "nftables" ]; then
+    sudo modprobe nf_tables
+fi
+
 sudo sysctl --system
 # At this point, a secondary node is fully configured until it is time for the node to join the cluster.
 if [ "$ROLE" == "$SECONDARY_ARG" ] ; then
