@@ -63,8 +63,14 @@ echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.
 sudo apt-get update
 sudo apt-get install -y kubelet kubeadm kubectl
 
-# Set to use private IP
-sudo sed -i.bak "s/KUBELET_CONFIG_ARGS=--config=\/var\/lib\/kubelet\/config\.yaml/KUBELET_CONFIG_ARGS=--config=\/var\/lib\/kubelet\/config\.yaml --node-ip=REPLACE_ME_WITH_IP/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+sudo mkdir -p /etc/kubeadm/
+
+sudo kubeadm config print init-defaults > /etc/kubeadm/config.yaml
+
+sudo sed -i "s/advertiseAddress: 1.2.3.4/advertiseAddress: REPLACE_ME_WITH_IP/" /etc/kubeadm/config.yaml
+
+
+sudo sed -i "/kubernetesVersion: .*/i controlPlaneEndpoint: \"REPLACE_ME_WITH_IP:6443\"" /etc/kubeadm/config.yaml
 
 # HELM
 curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null

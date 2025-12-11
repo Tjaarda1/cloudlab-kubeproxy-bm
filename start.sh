@@ -351,7 +351,7 @@ if [ "$ROLE" == "$SECONDARY_ARG" ] ; then
     fi
     
     # Use second argument (node IP) to replace filler in kubeadm configuration
-    # sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+    sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/kubeadm/config.yaml
 
     setup_secondary
     exit 0
@@ -366,7 +366,7 @@ if [ "$START_K8S" = "False" ]; then
 fi
 
 # Use second argument (node IP) to replace filler in kubeadm configuration
-# sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/kubeadm/config.yaml
 
 # Finish setting up the primary node
 # Argument is node_ip
