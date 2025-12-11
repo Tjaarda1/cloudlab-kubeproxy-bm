@@ -94,7 +94,7 @@ setup_primary() {
             ;;
         *)
             # Fallback default 
-            POD_CIDR="10.96.0.0/16"
+            POD_CIDR="10.244.0.0/16"
             ;;
     esac
    # Use second argument (node IP) to replace filler in kubeadm configuration
