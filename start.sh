@@ -69,8 +69,11 @@ setup_secondary() {
 	fi
     done
 
+
+    sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/kubeadm/join-config.yaml
+
     # Remove forward slash, since original command was on two lines
-    MY_CMD=$(echo sudo $MY_CMD | sed 's/\\//')
+    MY_CMD=$(echo sudo $MY_CMD --config /etc/kubeadm/join-config.yaml | sed 's/\\//')
 
     printf "%s: %s\n" "$(date +"%T.%N")" "Command to execute is: $MY_CMD"
 
@@ -79,41 +82,16 @@ setup_secondary() {
     printf "%s: %s\n" "$(date +"%T.%N")" "Done!"
 }
 setup_primary() {
-    case "$CNI_PLUGIN" in
-        "flannel")
-            POD_CIDR="10.244.0.0/16"
-            ;;
-        "calico")
-            POD_CIDR="192.168.0.0/16"
-            ;;
-        "cilium")
-            POD_CIDR="10.0.0.0/8"
-            ;;
-        *)
-            # Fallback default (usually Flannel's default)
-            POD_CIDR="10.244.0.0/16"
-            ;;
-    esac
+   # Use second argument (node IP) to replace filler in kubeadm configuration
+    sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/kubeadm/init-config.yaml
+    sudo sed -i.bak "s|REPLACE_ME_WITH_CIDR|$POD_CIDR|g" /etc/kubeadm/init-config.yaml
     # initialize k8 primary node
     printf "%s: %s\n" "$(date +"%T.%N")" "Starting Kubernetes... (this can take several minutes)... "
     if [ "$KUBE_PROXY_MODE" == "ebpf" ]; then
-        sudo kubeadm init --apiserver-advertise-address=$NODE_IP --pod-network-cidr=$POD_CIDR --skip-phases=addon/kube-proxy > $INSTALL_DIR/k8s_install.log 2>&1
+        sudo kubeadm init  --skip-phases=addon/kube-proxy --config /etc/kubeadm/init-config.yaml > $INSTALL_DIR/k8s_install.log 2>&1
         
-        if [ "$CNI_PLUGIN" == "cilium" ]; then
-
-            sudo helm repo add cilium https://helm.cilium.io/
-            API_SERVER_IP=$NODE_IP
-            API_SERVER_PORT=6443
-            sudo helm install cilium cilium/cilium --version 1.18.4 \
-                --namespace kube-system \
-                --set kubeProxyReplacement=true \
-                --set k8sServiceHost=${API_SERVER_IP} \
-                --set k8sServicePort=${API_SERVER_PORT}
-        else
-            printf "TODO"
-        fi
     else
-        sudo kubeadm init --apiserver-advertise-address=$NODE_IP --pod-network-cidr=$POD_CIDR > $INSTALL_DIR/k8s_install.log 2>&1
+        sudo kubeadm init  --config /etc/kubeadm/init-config.yaml > $INSTALL_DIR/k8s_install.log 2>&1
     fi
     if [ $? -eq 0 ]; then
         printf "%s: %s\n" "$(date +"%T.%N")" "Done! Output in $INSTALL_DIR/k8s_install.log"
@@ -186,6 +164,15 @@ apply_cni() {
                     echo "***Error: Error when installing Cilium. Logs in $INSTALL_DIR/cilium_install.log"
                     exit 1
                 fi
+            else 
+                sudo helm repo add cilium https://helm.cilium.io/
+                API_SERVER_IP=$NODE_IP
+                API_SERVER_PORT=6443
+                sudo helm install cilium cilium/cilium --version 1.18.4 \
+                    --namespace kube-system \
+                    --set kubeProxyReplacement=true \
+                    --set k8sServiceHost=${API_SERVER_IP} \
+                    --set k8sServicePort=${API_SERVER_PORT}
             fi
             ;;
             
@@ -319,7 +306,7 @@ sudo groupadd $PROFILE_GROUP
 for FILE in /users/*; do
     CURRENT_USER=${FILE##*/}
     sudo gpasswd -a $CURRENT_USER $PROFILE_GROUP
-    sudo gpasswd -a $CURRENT_USER docker
+    sudo gpasswd -a $CURRENT_USER docker/etc/kubeadm/config.yaml
 done
 sudo chown -R $USER:$PROFILE_GROUP $INSTALL_DIR
 sudo chmod -R g+rw $INSTALL_DIR
@@ -365,7 +352,7 @@ if [ "$ROLE" == "$SECONDARY_ARG" ] ; then
     fi
     
     # Use second argument (node IP) to replace filler in kubeadm configuration
-    sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/kubeadm/config.yaml
+   # sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/kubeadm/config.yaml
 
     setup_secondary
     exit 0
@@ -378,9 +365,22 @@ if [ "$START_K8S" = "False" ]; then
     printf "%s: %s\n" "$(date +"%T.%N")" "Start Kubernetes is $START_K8S, done!"
     exit 0
 fi
+case "$CNI_PLUGIN" in
+    "flannel")
+        POD_CIDR="10.244.0.0/16"
+        ;;
+    "calico")
+        POD_CIDR="192.168.0.0/16"
+        ;;
+    "cilium")
+        POD_CIDR="10.0.0.0/8"
+        ;;
+    *)
+        # Fallback default 
+        POD_CIDR="10.96.0.0/16"
+        ;;
+esac
 
-# Use second argument (node IP) to replace filler in kubeadm configuration
-sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/kubeadm/config.yaml
 
 # Finish setting up the primary node
 # Argument is node_ip
