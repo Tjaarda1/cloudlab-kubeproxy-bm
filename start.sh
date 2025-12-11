@@ -70,11 +70,10 @@ setup_secondary() {
     done
 
 
-    sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/kubeadm/join-config.yaml
+    echo "KUBELET_EXTRA_ARGS=--node-ip=$NODE_IP" | sudo tee /etc/default/kubelet
 
     # Remove forward slash, since original command was on two lines
-    MY_CMD=$(echo sudo $MY_CMD --config /etc/kubeadm/join-config.yaml | sed 's/\\//')
-
+    MY_CMD=$(echo sudo $MY_CMD | sed 's/\\//')
     printf "%s: %s\n" "$(date +"%T.%N")" "Command to execute is: $MY_CMD"
 
     # run command to join kubernetes cluster
@@ -196,23 +195,6 @@ apply_cni() {
             ;;
     esac
 
-    # Generic wait for all system pods (handles Calico, Cilium, and CoreDNS startup)
-    printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for all kube-system pods to reach 'Running' status..."
-    
-    # Simple loop to ensure stabilization
-    sleep 5 
-    
-    while true; do
-        # Get count of pods not running (ignoring Completed jobs)
-        NOT_RUNNING=$(kubectl get pods -n kube-system --no-headers | grep -v "Running\|Completed" | wc -l)
-        
-        if [ "$NOT_RUNNING" -eq 0 ]; then
-            break
-        fi
-        
-        printf "."
-        sleep 2
-    done
     
     printf "\n%s: %s\n" "$(date +"%T.%N")" "All Kubernetes system pods are running!"
 }

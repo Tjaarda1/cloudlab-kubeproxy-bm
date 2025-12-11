@@ -76,9 +76,6 @@ sudo sed -i "/kubernetesVersion: .*/i controlPlaneEndpoint: \"REPLACE_ME_WITH_IP
 sudo sed -i '/nodeRegistration:/a \  kubeletExtraArgs:\n    - name: "node-ip" \n      value: "REPLACE_ME_WITH_IP"' /etc/kubeadm/init-config.yaml
 sudo sed -i '/serviceSubnet: .*/a \  podSubnet: "REPLACE_ME_WITH_CIDR"' /etc/kubeadm/init-config.yaml
 
-sudo kubeadm config print join-defaults | sudo tee /etc/kubeadm/join-config.yaml
-sudo sed -i '/nodeRegistration:/a \  kubeletExtraArgs:\n    - name: "node-ip" \n      value: "REPLACE_ME_WITH_IP"' /etc/kubeadm/join-config.yaml
-
 # HELM
 curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
 echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
