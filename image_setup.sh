@@ -66,12 +66,18 @@ sudo apt-mark hold kubelet kubeadm kubectl
 
 sudo mkdir -p /etc/kubeadm/
 
-sudo kubeadm config print init-defaults | sudo tee /etc/kubeadm/config.yaml
+sudo kubeadm config print init-defaults | sudo tee /etc/kubeadm/init-config.yaml
 
-sudo sed -i "s/advertiseAddress: 1.2.3.4/advertiseAddress: REPLACE_ME_WITH_IP/" /etc/kubeadm/config.yaml
+sudo sed -i "s/advertiseAddress: 1.2.3.4/advertiseAddress: REPLACE_ME_WITH_IP/" /etc/kubeadm/init-config.yaml
 
 
-sudo sed -i "/kubernetesVersion: .*/i controlPlaneEndpoint: \"REPLACE_ME_WITH_IP:6443\"" /etc/kubeadm/config.yaml
+sudo sed -i "/kubernetesVersion: .*/i controlPlaneEndpoint: \"REPLACE_ME_WITH_IP:6443\"" /etc/kubeadm/init-config.yaml
+
+sudo sed -i '/nodeRegistration:/a \  kubeletExtraArgs:\n    - name: "node-ip" \n      value: "REPLACE_ME_WITH_IP"' /etc/kubeadm/init-config.yaml
+sudo sed -i "s/serviceSubnet: 10.96.0.0\/12/serviceSubnet: REPLACE_ME_WITH_CIDR/" /etc/kubeadm/init-config.yaml
+
+sudo kubeadm config print join-defaults | sudo tee /etc/kubeadm/join-config.yaml
+sudo sed -i '/nodeRegistration:/a \  kubeletExtraArgs:\n    - name: "node-ip" \n      value: "REPLACE_ME_WITH_IP"' /etc/kubeadm/join-config.yaml
 
 # HELM
 curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
