@@ -6,7 +6,7 @@ set -x
 # Use particular docker and kubernetes versions. When I've tried to upgrade, I've seen slowdowns in 
 # pod creation.
 DOCKER_VERSION_STRING=5:27.3.1-1~ubuntu.24.04~noble
-KUBERNETES_VERSION_STRING=1.34
+KUBERNETES_VERSION_STRING=1.34 # DO NOT CHANGE UNLESS YOU ARE WILLING TO ADAPT THE SCRIPT OTHER VERSION !!!! 
 
 # Unlike home directories, this directory will be included in the image
 USER_GROUP=eebpf
