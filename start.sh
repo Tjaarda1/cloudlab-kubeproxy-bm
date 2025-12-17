@@ -99,6 +99,16 @@ setup_primary() {
    # Use second argument (node IP) to replace filler in kubeadm configuration
     sudo sed -i.bak "s/REPLACE_ME_WITH_IP/$NODE_IP/g" /etc/kubeadm/init-config.yaml
     sudo sed -i.bak "s|REPLACE_ME_WITH_CIDR|$POD_CIDR|g" /etc/kubeadm/init-config.yaml
+
+    if [ "$KUBE_PROXY_MODE" != "ebpf" ]; then
+        cat <<EOF | sudo tee -a /etc/kubeadm/init-config.yaml
+---
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+mode: "$KUBE_PROXY_MODE"
+EOF
+    fi
+    
     # initialize k8 primary node
     printf "%s: %s\n" "$(date +"%T.%N")" "Starting Kubernetes... (this can take several minutes)... "
     if [ "$KUBE_PROXY_MODE" == "ebpf" ]; then
