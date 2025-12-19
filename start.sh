@@ -158,13 +158,14 @@ apply_cni() {
             
         "calico")
             # Only apply here if not in eBPF mode (if eBPF, usually handled via specialized config or different CNI usage)
+            printf "%s: %s\n" "$(date +"%T.%N")" "Installing Tigera Operator..."
+            kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.2/manifests/tigera-operator.yaml >> $INSTALL_DIR/calico_install.log 2>&1
+            printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for Tigera Operator to be available..."
+            kubectl wait --for=condition=available --timeout=90s deployment/tigera-operator -n tigera-operator >> $INSTALL_DIR/calico_install.log 2>&1
+
             if [ "$KUBE_PROXY_MODE" != "ebpf" ]; then
-                printf "%s: %s\n" "$(date +"%T.%N")" "Installing Tigera Operator..."
-                kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.2/manifests/tigera-operator.yaml >> $INSTALL_DIR/calico_install.log 2>&1
                 
                 # CRITICAL: Wait for the operator to establish CRDs before creating custom resources
-                printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for Tigera Operator to be available..."
-                kubectl wait --for=condition=available --timeout=90s deployment/tigera-operator -n tigera-operator >> $INSTALL_DIR/calico_install.log 2>&1
 
                 printf "%s: %s\n" "$(date +"%T.%N")" "Applying Calico Custom Resources..."
                 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.2/manifests/custom-resources.yaml >> $INSTALL_DIR/calico_install.log 2>&1
@@ -173,7 +174,66 @@ apply_cni() {
                     echo "***Error: Error when installing Calico resources. Logs in $INSTALL_DIR/calico_install.log"
                     exit 1
                 fi
-            fi
+            else
+                kubectl patch deployment -n tigera-operator tigera-operator -p '{"spec":{"template":{"spec":{"dnsConfig":{"nameservers":["169.254.169.253"]}}}}}'                
+                kubectl apply -f - <<EOF
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: kubernetes-services-endpoint
+  namespace: tigera-operator
+data:
+  KUBERNETES_SERVICE_HOST: "$NODE_IP"
+  KUBERNETES_SERVICE_PORT: "6443"
+EOF
+                # This section includes base Calico installation configuration.
+# For more information, see: https://docs.tigera.io/calico/latest/reference/installation/api#operator.tigera.io/v1.Installation
+                cat <<EOF custom-resources.yaml
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  name: default
+spec:
+  # Configures Calico networking.
+  calicoNetwork:
+    linuxDataplane: BPF
+    ipPools:
+      - name: default-ipv4-ippool
+        blockSize: 26
+        cidr: ${POD_CIDR}
+        encapsulation: VXLANCrossSubnet
+        natOutgoing: Enabled
+        nodeSelector: all()
+
+---
+# This section configures the Calico API server.
+# For more information, see: https://docs.tigera.io/calico/latest/reference/installation/api#operator.tigera.io/v1.APIServer
+apiVersion: operator.tigera.io/v1
+kind: APIServer
+metadata:
+  name: default
+spec: {}
+
+---
+# Configures the Calico Goldmane flow aggregator.
+apiVersion: operator.tigera.io/v1
+kind: Goldmane
+metadata:
+  name: default
+
+---
+# Configures the Calico Whisker observability UI.
+apiVersion: operator.tigera.io/v1
+kind: Whisker
+metadata:
+  name: default
+EOF
+                kubectl create -f custom-resources.yaml >> $INSTALL_DIR/calico_install.log 2>&1
+                
+                if [ $? -ne 0 ]; then
+                    echo "***Error: Error when installing Calico resources. Logs in $INSTALL_DIR/calico_install.log"
+                    exit 1
+                fi
             ;;
             
         "cilium")
