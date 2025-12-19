@@ -234,6 +234,7 @@ EOF
                     echo "***Error: Error when installing Calico resources. Logs in $INSTALL_DIR/calico_install.log"
                     exit 1
                 fi
+            fi
             ;;
             
         "cilium")
