@@ -16,7 +16,7 @@ import geni.rspec.pg as rspec
 
 BASE_IP = "10.10.1"
 BANDWIDTH = 10000000
-IMAGE = ' urn:publicid:IDN+apt.emulab.net+image+meshbench-PG0:kubeproxy-bm:5'
+IMAGE = ' urn:publicid:IDN+apt.emulab.net+image+meshbench-PG0:kubeproxy-bm:6'
 
 # Set up parameters
 pc = portal.Context()
