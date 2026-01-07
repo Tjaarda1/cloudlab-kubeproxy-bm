@@ -161,11 +161,9 @@ apply_cni() {
             printf "%s: %s\n" "$(date +"%T.%N")" "Installing Tigera Operator..."
             kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.2/manifests/tigera-operator.yaml >> $INSTALL_DIR/calico_install.log 2>&1
             printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for Tigera Operator to be available..."
-            kubectl wait --for=condition=available --timeout=90s deployment/tigera-operator -n tigera-operator >> $INSTALL_DIR/calico_install.log 2>&1
-
+            kubectl wait --for=condition=Ready --timeout=90s pod -l k8s-app=tigera-operator -n tigera-operator >> $INSTALL_DIR/calico_install.log 2>&1
             if [ "$KUBE_PROXY_MODE" != "ebpf" ]; then
                 
-                # CRITICAL: Wait for the operator to establish CRDs before creating custom resources
 
                 printf "%s: %s\n" "$(date +"%T.%N")" "Applying Calico Custom Resources..."
                 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.2/manifests/custom-resources.yaml >> $INSTALL_DIR/calico_install.log 2>&1
@@ -188,7 +186,7 @@ data:
 EOF
                 # This section includes base Calico installation configuration.
 # For more information, see: https://docs.tigera.io/calico/latest/reference/installation/api#operator.tigera.io/v1.Installation
-                cat <<EOF custom-resources.yaml
+                cat <<EOF > custom-resources.yaml
 apiVersion: operator.tigera.io/v1
 kind: Installation
 metadata:
