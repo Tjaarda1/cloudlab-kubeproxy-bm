@@ -78,7 +78,9 @@ sudo sed -i '/serviceSubnet: .*/a \  podSubnet: "REPLACE_ME_WITH_CIDR"' /etc/kub
 
 sudo sed -i '/name: node/d' /etc/kubeadm/init-config.yaml
 
-echo 'source <(kubectl completion bash)' >>~/.bashrc
+kubectl completion bash | sudo tee /etc/bash_completion.d/kubectl > /dev/null
+sudo chmod a+r /etc/bash_completion.d/kubectl
+
 # HELM
 curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
 echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
