@@ -39,7 +39,7 @@ pc.defineParameter("cni",
                    "CNI Plugin",
                    portal.ParameterType.STRING,
                    "flannel",
-                   legalValues=["flannel", "calico", "cilium"],
+                   legalValues=["flannel", "calico", "cilium", "none"],
                    longDescription="Choose which CNI Plugin will be used.")
 
 # --- KubeProxy Parameter ---

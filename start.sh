@@ -260,7 +260,7 @@ EOF
             ;;
             
         *)
-            printf "CNI '%s' not recognized\n" "$CNI_PLUGIN"
+            printf "Skipping CNI installation" 
             ;;
     esac
 
