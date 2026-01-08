@@ -241,7 +241,7 @@ EOF
             if [ "$KUBE_PROXY_MODE" != "ebpf" ]; then
                 sudo helm repo add cilium https://helm.cilium.io/
                 sudo helm repo update
-                sudo helm install cilium cilium/cilium --version 1.18.4 --namespace kube-system >> $INSTALL_DIR/cilium_install.log 2>&1
+                sudo helm install cilium cilium/cilium --version 1.18.4 --set debug.enabled=true --namespace kube-system >> $INSTALL_DIR/cilium_install.log 2>&1
                 
                 if [ $? -ne 0 ]; then
                     echo "***Error: Error when installing Cilium. Logs in $INSTALL_DIR/cilium_install.log"
@@ -255,7 +255,8 @@ EOF
                     --namespace kube-system \
                     --set kubeProxyReplacement=true \
                     --set k8sServiceHost=${API_SERVER_IP} \
-                    --set k8sServicePort=${API_SERVER_PORT}
+                    --set k8sServicePort=${API_SERVER_PORT} \
+                    --set debug.enabled=true
             fi
             ;;
             
