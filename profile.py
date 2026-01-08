@@ -49,6 +49,16 @@ pc.defineParameter("kubeproxy",
                    "iptables",
                    legalValues=["iptables", "ipvs", "nftables", "ebpf"],
                    longDescription="Choose kubeproxy mode. Note: eBPF mode is only supported for Calico and Cilium.")
+pc.defineParameterGroup("additional","Additional parameters")
+pc.defineParameter("socketLB",
+                   "Socket LB in cilium eBPF",
+                   portal.ParameterType.BOOLEAN,
+                   False,
+                   groupId="additional",
+                   advanced=True,
+                   longDescription="Enable socket load balancing in cilium eBPF mode. If a cni + kubeproxy configuration is chosen other than cilium + ebpf, nothing will change")
+
+
 # Below option copy/pasted directly from small-lan experiment on CloudLab
 # Optional ephemeral blockstore
 pc.defineParameter("tempFileSystemSize", 
@@ -65,7 +75,7 @@ params = pc.bindParameters()
 
 if params.kubeproxy == "ebpf":
     if params.cni not in ["calico", "cilium", "none"]:
-        perr = portal.ParameterError(
+        eerr = portal.ParameterError(
             "KubeProxy in 'ebpf' mode is only supported when CNI is Calico or Cilium.",
             ['kubeproxy', 'cni'] 
         )
@@ -107,14 +117,16 @@ for i in range(params.nodeCount):
 
 # Iterate over secondary nodes first
 for i, node in enumerate(nodes[1:]):
-    cmd = "bash /local/repository/start.sh secondary {}.{} {} {} {} > /home/eebpf/start.log 2>&1 &".format(
-        BASE_IP, i + 2, params.startKubernetes, params.cni, params.kubeproxy
+    cmd = "bash /local/repository/start.sh secondary {}.{} {} {} {} {} > /home/eebpf/start.log 2>&1 &".format(
+        BASE_IP, i + 2, params.startKubernetes, params.cni, params.kubeproxy, params.socketLB
     )
+
     node.addService(rspec.Execute(shell="bash", command=cmd))
 
-cmd_primary = "bash /local/repository/start.sh primary {}.1 {} {} {} {} > /home/eebpf/start.log 2>&1".format(
-    BASE_IP, params.nodeCount, params.startKubernetes, params.cni, params.kubeproxy
+cmd_primary = "bash /local/repository/start.sh primary {}.1 {} {} {} {} {} > /home/eebpf/start.log 2>&1".format(
+    BASE_IP, params.nodeCount, params.startKubernetes, params.cni, params.kubeproxy, params.socketLB
 )
+
 nodes[0].addService(rspec.Execute(shell="bash", command=cmd_primary))
 
 pc.printRequestRSpec()

@@ -10,8 +10,9 @@ MULTUS_COMMIT="77e0150"
 PRIMARY_ARG="primary"
 SECONDARY_ARG="secondary"
 USAGE=$'Usage:
-\t./start.sh secondary <node_ip> <start_kubernetes> <cni_plugin> <kube_proxy_mode>
-\t./start.sh primary   <node_ip> <num_nodes> <start_kubernetes> <cni_plugin> <kube_proxy_mode>'
+\t./start.sh secondary <node_ip> <start_kubernetes> <cni_plugin> <kube_proxy_mode> <socket_lb>
+\t./start.sh primary   <node_ip> <num_nodes> <start_kubernetes> <cni_plugin> <kube_proxy_mode> <socket_lb>'
+
 
 printf "%s: args=(" "$(date +"%T.%N")"
 for var in "$@"; do
@@ -248,6 +249,10 @@ EOF
                     exit 1
                 fi
             else 
+                SOCKET_LB_FLAG="--set socketLB.hostNamespaceOnly=true"
+                if [ "$SOCKET_LB" == "True" ] || [ "$SOCKET_LB" == "true" ]; then
+                    SOCKET_LB_FLAG="--set socketLB.hostNamespaceOnly=false"
+                fi
                 sudo helm repo add cilium https://helm.cilium.io/
                 API_SERVER_IP=$NODE_IP
                 API_SERVER_PORT=6443
@@ -256,7 +261,8 @@ EOF
                     --set kubeProxyReplacement=true \
                     --set k8sServiceHost=${API_SERVER_IP} \
                     --set k8sServicePort=${API_SERVER_PORT} \
-                    --set debug.enabled=true
+                    --set debug.enabled=true \
+                    $SOCKET_LB_FLAG
             fi
             ;;
             
@@ -346,17 +352,20 @@ NODE_IP=$2
 
 # 2. Parse remaining arguments based on Role
 if [[ "$ROLE" == "primary" ]]; then
-    # Primary args: IP, NodeCount, StartK8s, CNI, Proxy
+    # Primary args: IP, NodeCount, StartK8s, CNI, Proxy, SocketLB
     NODE_COUNT=$3
     START_K8S=$4
     CNI_PLUGIN=$5
     KUBE_PROXY_MODE=$6
+    SOCKET_LB=$7
 else
-    # Secondary args: IP, StartK8s, CNI, Proxy (NodeCount is skipped)
+    # Secondary args: IP, StartK8s, CNI, Proxy, SocketLB (NodeCount is skipped)
     START_K8S=$3
     CNI_PLUGIN=$4
     KUBE_PROXY_MODE=$5
+    SOCKET_LB=$6
 fi
+
 
 # Kubernetes does not support swap, so we must disable it
 disable_swap
