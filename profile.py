@@ -64,7 +64,7 @@ pc.defineParameter("tempFileSystemSize",
 params = pc.bindParameters()
 
 if params.kubeproxy == "ebpf":
-    if params.cni not in ["calico", "cilium"]:
+    if params.cni not in ["calico", "cilium", "none"]:
         perr = portal.ParameterError(
             "KubeProxy in 'ebpf' mode is only supported when CNI is Calico or Cilium.",
             ['kubeproxy', 'cni'] 
