@@ -112,7 +112,7 @@ EOF
     
     # initialize k8 primary node
     printf "%s: %s\n" "$(date +"%T.%N")" "Starting Kubernetes... (this can take several minutes)... "
-    if [ "$KUBE_PROXY_MODE" == "ebpf" ]; then
+    if [[ "$KUBE_PROXY_MODE" == "skip" || "$KUBE_PROXY_MODE" == "ebpf" ]]; then
         sudo kubeadm init  --skip-phases=addon/kube-proxy --config /etc/kubeadm/init-config.yaml > $INSTALL_DIR/k8s_install.log 2>&1
         
     else

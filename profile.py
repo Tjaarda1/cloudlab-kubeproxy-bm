@@ -47,7 +47,7 @@ pc.defineParameter("kubeproxy",
                    "KubeProxy Mode",
                    portal.ParameterType.STRING,
                    "iptables",
-                   legalValues=["iptables", "ipvs", "nftables", "ebpf"],
+                   legalValues=["iptables", "ipvs", "nftables", "ebpf", "skip"],
                    longDescription="Choose kubeproxy mode. Note: eBPF mode is only supported for Calico and Cilium.")
 pc.defineParameterGroup("additional","Additional parameters")
 pc.defineParameter("socketLB",
