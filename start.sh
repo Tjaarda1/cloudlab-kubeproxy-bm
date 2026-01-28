@@ -163,8 +163,11 @@ apply_cni() {
             kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.2/manifests/tigera-operator.yaml >> $INSTALL_DIR/calico_install.log 2>&1
             printf "%s: %s\n" "$(date +"%T.%N")" "Waiting for Tigera Operator to be available..."
             kubectl wait --for=condition=Ready --timeout=90s pod -l k8s-app=tigera-operator -n tigera-operator >> $INSTALL_DIR/calico_install.log 2>&1
+            # TODO: this is not enough, sometimes the pod is running but still needs some time to setup, and it may fail to take the custom resources. fix.
+            sleep 20
             if [ "$KUBE_PROXY_MODE" != "ebpf" ]; then
                 
+
 
                 printf "%s: %s\n" "$(date +"%T.%N")" "Applying Calico Custom Resources..."
                 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.2/manifests/custom-resources.yaml >> $INSTALL_DIR/calico_install.log 2>&1
@@ -265,7 +268,25 @@ EOF
                     $SOCKET_LB_FLAG
             fi
             ;;
+            "cilium-min")
             
+                SOCKET_LB_FLAG="--set socketLB.hostNamespaceOnly=true"
+                if [ "$SOCKET_LB" == "True" ] || [ "$SOCKET_LB" == "true" ]; then
+                    SOCKET_LB_FLAG="--set socketLB.hostNamespaceOnly=false"
+                fi
+                sudo helm repo add cilium https://helm.cilium.io/
+                API_SERVER_IP=$NODE_IP
+                API_SERVER_PORT=6443
+                sudo helm install cilium cilium/cilium --version 1.18.4 \
+                    --namespace kube-system \
+                    --set kubeProxyReplacement=true \
+                    --set k8sServiceHost=${API_SERVER_IP} \
+                    --set k8sServicePort=${API_SERVER_PORT} \
+                    --set image.repository=alexdecb/cilium \
+                    --set image.tag=lbtest \  
+                    $SOCKET_LB_FLAG
+            fi
+            ;;
         *)
             printf "Skipping CNI installation" 
             ;;
