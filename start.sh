@@ -285,7 +285,7 @@ EOF
                     --set image.repository=alexdecb/cilium \
                     --set image.tag=lbtest \  
                     $SOCKET_LB_FLAG
-            fi
+            
             ;;
         *)
             printf "Skipping CNI installation" 
