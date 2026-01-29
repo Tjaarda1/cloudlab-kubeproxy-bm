@@ -284,7 +284,8 @@ EOF
                     --set k8sServicePort=${API_SERVER_PORT} \
                     --set image.repository=alexdecb/cilium \
                     --set image.tag=lbtest \  
-                    $SOCKET_LB_FLAG
+                    --set image.digest="sha256:d3e2c32d0ffc1f84b38434bbdd9aee4478a2b3c984205b2f636de2a57e8ea8b3" \
+                    $SOCKET_LB_FLAG 
             
             ;;
         *)
